@@ -1,0 +1,39 @@
+(program) --> [program], (identyfikator), (blok).
+(blok)--> (deklaracje), [begin], (instrukcja_złozona), [end].
+(deklaracje) --> (puste) ; (deklaracje) (deklaracja).
+(deklaracja) --> (deklarator) ; (procedura).
+(deklarator) --> [local], (zmienne).
+(zmienne) --> (zmienna) ; (zmienne), [,], (zmienna).
+(zmienna) --> (identyfikator).
+(procedura) --> [procedure], (nazwa_procedury) ,[(] (argumenty_formalne) [)], (blok).
+(nazwa_procedury) --> (identyfikator).
+(argumenty_formalne) --> (puste) ; (ciag_argumentów_formalnych).
+(ciag_argumentów_formalnych) --> (argument_formalny) ; (ciag_argumentów_formalnych) , (argument_formalny).
+(argument formalny) --> (zmienna) ; value, (zmienna).
+(instrukcja złozona) --> (instrukcja) ; (instrukcja_złozona), [;], (instrukcja).
+(instrukcja) --> (zmienna) [:=], (wyrazenie, arytmetyczne)
+; [if], (wyrazenie_logiczne), [then], (instrukcja_złozona), [fi]
+; [if], (wyrazenie_logiczne), [then], (instrukcja_złozona), [else], (instrukcja_złozona), [fi]
+; [while], (wyrazenie_logiczne) ,[do] (instrukcja_złozona), [done]
+; [call], (wywołanie_procedury)
+; [return], (wyrazenie, arytmetyczne)
+; [read], (zmienna)
+; [write], (wyrazenie_arytmetyczne).
+(wyrazenie_arytmetyczne) --> (składnik) ; (wyrazenie_arytmetyczne) (operator_addytywny) (składnik).
+(operator_addytywny) --> [+] ; [-].
+(składnik) --> (czynnik) ; (składnik) (operator_multiplikatywny) (czynnik).
+(operator_multiplikatywny) --> [*] ; [div] ; [mod].
+(czynnik) --> (wyrazenie_proste) ; [-], (wyrazenie_proste).
+(wyrazenie_proste) --> (wyrazenie, atomowe) ; [(], (wyrazenie_arytmetryczne) [)].
+(wyrazenie_atomowe) --> (zmienna) ; (wywołanie_procedury) ; (literał_całkowitoliczbowy).
+(wywołanie_procedury) --> (nazwa_procedury) [(], (argumenty_faktyczne) [])].
+(argumenty_faktyczne) --> (puste) ; (ciag, argumentów_faktycznych).
+(ciag_argumentów_faktycznych) --> (argument_faktyczny) ; (ciag_argumentów_faktycznych) , (argument_faktyczny).
+(argument_faktyczny) --> (wyrazenie_arytmetyczne).
+(wyrazenie_logiczne) --> (koniunkcja) ; (wyrazenie_logiczne) ,[or], (koniunkcja).
+(koniunkcja) --> (warunek) ; (koniunkcja) [and], (warunek).
+(warunek) --> (wyrazenie_relacyjne) ; [not] , (wyrazenie_relacyjne).
+(wyrazenie_relacyjne) --> (wyrazenie_arytmetyczne), (operator_relacyjny), (wyrazenie_arytmetyczne).
+; ( (wyrazenie_logiczne) ).
+(operator_relacyjny) --> [<] ; [<=] ; [>] ; [>=] ; [=] ; [<>].
+(puste) --> [].
