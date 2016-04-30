@@ -115,7 +115,7 @@ identifier(L, Id) -->
    add appropriate semantic actions generating abstract syntax trees.
 */
 % program----------------------------------------------------------------
-parser(program(EV,EF,I)) --> [tProgram],!,[_], block(EV,EF,I).
+parser(program(EV,EF,I)) --> [tProgram],[_], block(EV,EF,I).
 block(EV,EF,I) --> declarations(EV,EF), [tBegin], instructions(I), [tEnd].
 % deklaracje-------------------------------------------------------------
 declarations(EV,[F|EF]) --> procDecl(F),!,declarations(EV,EF).
@@ -126,7 +126,7 @@ fDeclarations([F|EF]) --> procDecl(F),!,fDeclarations(EF).
 fDeclarations([]) --> [].
 
 varDecl([V|EV]) --> [tLocal],[tVar(Id)],{V = var(Id,Adr)}, cvarDecl(EV).
-cvarDecl([V|EV]) --> [tColon], [tVar(Id)],{V = var(Id,Adr)} , cvarDecl(EV).
+cvarDecl([V|EV]) --> [tColon],!, [tVar(Id)],{V = var(Id,Adr)} , cvarDecl(EV).
 cvarDecl([]) --> [].
 
 procDecl(F) --> [tProcedure], [tVar(Id)],
@@ -143,8 +143,9 @@ cprocArgs([]) --> [].
 procArg(A) --> [tValue],!, [tVar(Id)],{A = arg(Id, value)}.
 procArg(A) --> [tVar(Id)], {A = arg(Id, name)}.
 % instrukcje--------------------------------------------------------------
-instructions([I|IS]) --> instruction(I), [tSColon],!, instructions(IS).
-instructions([I]) --> instruction(I).
+instructions([I|IS]) --> instruction(I), cinstructions(IS).
+cinstructions([I|IS]) --> [tSColon], instruction(I), cinstructions(IS).
+cinstructions([]) --> [].
 instruction(I) --> (
     [tVar(Id)],!,[tAssgn], arithmeticExpr(E), {I = assign(var(Id),expr(E))} ;
     [tIf],!, boolExpr(B),
@@ -160,7 +161,7 @@ instruction(I) --> (
     [tCall],!, fcall(F), {I = F};
     [tReturn],!, arithmeticExpr(E),{I = return(expr(E))};
     [tRead],!, [tVar(Id)], {I = read(var(Id))};
-    [tWrite],!, arithmeticExpr(E), {I = write(expr(E))}
+    [tWrite], arithmeticExpr(E), {I = write(expr(E))}
 ).
 % wyrazenia-arytmetyczne--------------------------------------------------
 arithmeticExpr(E) --> addtiveExpr(E).
@@ -177,7 +178,7 @@ patomicExpr(S) --> ( atomicExpr(S), !; [tLParen], arithmeticExpr(S), [tRParen]).
 atomicExpr(S) --> (
     fcall(F),!, {S = F};
     [tVar(Id)],!, {S = var(Id)};
-    [tNum(S)]).
+    [tNumber(S)]).
 
 addtiveOp(plus) --> [tPlus],!.
 addtiveOp(minus) --> [tMinus].
@@ -213,4 +214,85 @@ relationalOp(Op) -->(
     [tGt],!,{Op = gt};
     [tNeq],!,{Op = neq}).
 
-% TWI, Mar 15, 2009
+% makro-asembler----------------------------------------------------------
+%%	store(Addr): ACC -> Addr
+%%	load(Addr): Addr -> ACC
+%%	concat: [list] -> list
+concat([H],H):-!.
+concat([H|L],R):-
+	concat(L,R2),
+	append(H,R2,R).
+
+%%	labels counter
+%
+:-nb_setval(counter,1).
+get_label_id(X):-
+	b_getval(counter,X),
+	N is X + 1,
+	b_setval(counter,N).
+
+
+makro_compile_instruction(assign(var(LValueId),expr(RValueId)),EV,EF,Makro):-!,
+	memberchk(var(LValueId,LVAddr),EV),
+	makro_compile_expression(RValueId,EV,EF,Makro_expr),
+	append(Makro_expr,[store(LVAddr)],Makro).
+
+%%	m_c_condition: Condition -> ACC = 0 if true ; ACC < 0 if false
+makro_compile_instruction(if(Condition,Then,Else),EV,EF,Makro):-!,
+	makro_compile_condition(Condition, EV, EF, Makro_Condition),
+	makro_compile(Then, EV, EF, Makro_Then),
+	makro_compile(Else, EV, EF, Makro_Else),
+	get_label_id(Else_id),
+	get_label_id(End_id),
+	concat([Makro_Condition, [branchn(label(Else_id))],
+		Makro_Then, [jump(label(Else_id)),label(End_id)],
+		Makro_Else, [label(End_id)]],Makro).
+
+makro_compile_instruction(if(Condition,Then),EV,EF,Makro):-!,
+	makro_compile_condition(Condition, EV, EF, Makro_Condition),
+	makro_compile(Then, EV, EF, Makro_Then),
+	get_label_id(End_id),
+	concat([Makro_Condition,[branchn(label(End_id))],Makro_Then,[label(End_id)]],Makro).
+makro_compile_instruction(while(Condition,Do),EV,EF,Makro):-!,
+	makro_compile_condition(Condition, EV, EF, Makro_Condition),
+	makro_compile_condition(Do, EV, EF, Makro_Do),
+	get_label_id(Start_id),
+	get_label_id(End_id),
+	concat([[label(Start_id)],Makro_Condition,
+	       [branchn(label(End_id))]
+	       ,Makro_Do,
+	       [jump(label(Start_id)),label(End_id)]],Makro).
+%makro_compile_instruction(funCall(Id,Args),EV,EF,Makro):-
+%makro_compile_instruction(return(expr(E)),EV,EF,Makro):-
+%%	write: ACC --> O
+makro_compile_instruction(read(var(X)),EV,EF,Makro):-!,
+	memberchk(var(X,Addr),EV),
+	Makro = [read(Addr)].
+makro_compile_instruction(write(expr(E)),EV,EF,Makro):-
+	makro_compile_expression(E,EV,EF,Makro_expr),
+	append(Makro_expr,[write],Makro).
+
+
+makro_compile_expression(E,EV,EF,Makro_expr):-
+	makro_compile_expression(0,E,EV,EF,Makro_expr).
+
+makro_compile_expression(N,E,EV,EF,Makro_expr):-
+	E =.. [Op, E1, E2],!,
+	makro_compile_expression(N,E1,EV,EF,Makro_expr1),
+	N2 is N+1,
+	makro_compile_expression(N2,E2,EV,EF,Makro_expr2),
+	concat([Makro_expr1,[push],Makro_expr2, [swapd,pop, Op]],Makro_expr).
+makro_compile_expression(N,var(X),EV,EF,Makro_expr):-!,
+	memberchk(var(X,Addr),EV),
+	Makro_expr = [load(Addr)].
+makro_compile_expression(N, funCall(Id,Args),EV,EF,Makro_expr):-!,
+	call_function(N,funCall(Id,Args),EV,EF,Makro_expr).
+makro_compile_expression(N, Number, EV, EF, [const(Number)]).
+
+
+
+
+
+
+
+
