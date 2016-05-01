@@ -43,14 +43,8 @@ lexer(Tokens) -->
                !
             ;  Token = tVar(Id)
             }
-      ;  [_],
-            { Token = tUnknown }
-      ),
-      !,
-         { Tokens = [Token | TokList] },
-      lexer(TokList)
-   ;  [],
-         { Tokens = [] }
+      ),!,{ Tokens = [Token | TokList] }, lexer(TokList)
+   ;  [],{ Tokens = [] }
    ).
 
 white_space --> "(*", !, comment.
@@ -237,31 +231,30 @@ makro_compile_instruction(assign(var(LValueId),expr(RValueId)),EV,EF,Makro):-!,
 	makro_compile_expression(RValueId,EV,EF,Makro_expr),
 	append(Makro_expr,[store(LVAddr)],Makro).
 
-%%	m_c_condition: Condition -> ACC = 0 if true ; ACC < 0 if false
 makro_compile_instruction(if(Condition,Then,Else),EV,EF,Makro):-!,
 	makro_compile_condition(Condition, EV, EF, Makro_Condition),
 	makro_compile(Then, EV, EF, Makro_Then),
 	makro_compile(Else, EV, EF, Makro_Else),
 	get_label_id(Else_id),
 	get_label_id(End_id),
-	concat([Makro_Condition, [branchn(label(Else_id))],
-		Makro_Then, [jump(label(Else_id)),label(End_id)],
+	concat([Makro_Condition, [branchn(Else_id)],
+		Makro_Then, [jump(Else_id),label(End_id)],
 		Makro_Else, [label(End_id)]],Makro).
 
 makro_compile_instruction(if(Condition,Then),EV,EF,Makro):-!,
 	makro_compile_condition(Condition, EV, EF, Makro_Condition),
 	makro_compile(Then, EV, EF, Makro_Then),
 	get_label_id(End_id),
-	concat([Makro_Condition,[branchn(label(End_id))],Makro_Then,[label(End_id)]],Makro).
+	concat([Makro_Condition,[branchn(End_id)],Makro_Then,[label(End_id)]],Makro).
 makro_compile_instruction(while(Condition,Do),EV,EF,Makro):-!,
 	makro_compile_condition(Condition, EV, EF, Makro_Condition),
-	makro_compile_condition(Do, EV, EF, Makro_Do),
+	makro_compile(Do, EV, EF, Makro_Do),
 	get_label_id(Start_id),
 	get_label_id(End_id),
 	concat([[label(Start_id)],Makro_Condition,
-	       [branchn(label(End_id))]
+	       [branchn(End_id)]
 	       ,Makro_Do,
-	       [jump(label(Start_id)),label(End_id)]],Makro).
+	       [jump(Start_id),label(End_id)]],Makro).
 %makro_compile_instruction(funCall(Id,Args),EV,EF,Makro):-
 %makro_compile_instruction(return(expr(E)),EV,EF,Makro):-
 %%	write: ACC --> O
@@ -287,6 +280,63 @@ makro_compile_expression(N,var(X),EV,EF,Makro_expr):-!,
 	Makro_expr = [load(Addr)].
 makro_compile_expression(N, funCall(Id,Args),EV,EF,Makro_expr):-!,
 	call_function(N,funCall(Id,Args),EV,EF,Makro_expr).
+makro_compile_expression(N, Number, EV, EF, [const(Number)]).
+
+%%	m_c_condition: Condition -> ACC = 0 if true ; ACC < 0 if false
+%%	branch should not destroy ACC
+makro_compile_codition(or(C1,C2), EV, EF, Makro_Condition):-
+	makro_compile_condition(C1, EV, EF, Makro_Condition1),
+	makro_compile_condition(C2, EV, EF, Makro_Condition2),
+	get_label_id(True_id),
+	concat([Makro_Condition1, [branchz(True_id)],
+		Makro_Condition2, [label(True_id)]]
+	       ,Makro_Condition).
+makro_compile_codition(and(C1,C2), EV, EF, Makro_Condition):-
+	makro_compile_condition(C1, EV, EF, Makro_Condition1),
+	makro_compile_condition(C2, EV, EF, Makro_Condition2),
+	get_label_id(False_id),
+	concat([Makro_Condition1, [branchn(False_id)],
+		Makro_Condition2, [label(False_id)]]
+	       ,Makro_Condition).
+makro_compile_condition(not(C), EV, EF, Makro_Condition):-
+	makro_compile_condition(C, EV, EF, Makro_Condition1),
+	get_label_id(False_id),
+	get_label_id(End_id),
+	concat([Makro_Condition1,[branchz(False_id),
+		const(0),jump(End_id),
+	        label(False_id),const(-1),
+		label(End_id)]],Makro_Condition).
+makro_compile_condition(R_Cond, EV, EF, Makro_Condition):-
+	R_Cond =.. [Op,E1,E2],
+	makro_compile_expression(E1,EV,EF,Makro_expr1),
+	makro_compile_expression(E2,EV,EF,Makro_expr2),
+
+	(   Op == eq,!, Swap = false, get_label_id(End_id),
+	    Jumps = [branchz(End_id),const(-1),label(End_id)]
+
+	;   Op == neq,!, Swap = false, get_label_id(False_id),get_label_id(End_id),
+	    Jumps = [branchz(False_id),const(0),jump(End_id),label(False_id),
+		    const(-1),label(End_id)]
+
+	;   Op == geq,!, Swap = false, get_label_id(End_id),
+	    Jumps = [branchn(End_id),const(0),label(End_id)]
+
+	;   Op == gt,!, Swap = true, get_label_id(True_id), get_label_id(End_id),
+	    Jumps = [branchn(True_id),const(-1), jump(End_id),
+		     label(True_id),const(0),label(End_id)]
+
+	;   Op == lt,!, Swap = false, get_label_id(True_id), get_label_id(End_id),
+	    Jumps = [branchn(True_id),const(-1), jump(End_id),
+		     label(True_id),const(0),label(End_id)]
+
+	;   Op == leq, Swap = true, get_label_id(End_id),
+	    Jumps = [branchn(End_id),const(0),label(End_id)]),
+	(   Swap == false,!,
+	    concat([Makro_expr1, [push],Makro_expr2,[swapd,pop,minus]],Start)
+	;   concat([Makro_expr2, [push],Makro_expr1,[swapd,pop,minus]],Start)),
+	concat([Start,Jumps],Makro_Condition).	.
+
+
 
 
 
