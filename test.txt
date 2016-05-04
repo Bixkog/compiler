@@ -1,24 +1,127 @@
 program gcd
-	local x, y
-	procedure euk(x,y)
-		local t
-	begin
-		while y <> 0 do
+	local x, y, t
+begin
+	read x;
+	read y;
+	while y <> 0 do
 		t := x mod y;
 		y := x;
 		x := t
 		done;
-		return y
-	end
-begin
-	read x;
-	read y;
-	write euk(x,y)
+	write t
 end
 
 [112,114,111,103,114,097,109,032,103,099,100,013,010,009,108,111,099,097,108,032,120,044,032,121,013,010,009,112,114,111,099,101,100,117,114,101,032,101,117,107,040,120,044,121,041,013,010,009,009,108,111,099,097,108,032,116,013,010,009,098,101,103,105,110,013,010,009,009,119,104,105,108,101,032,121,032,060,062,032,048,032,100,111,013,010,009,009,116,032,058,061,032,120,032,109,111,100,032,121,059,013,010,009,009,121,032,058,061,032,120,059,013,010,009,009,120,032,058,061,032,116,013,010,009,009,100,111,110,101,059,013,010,009,009,114,101,116,117,114,110,032,121,013,010,009,101,110,100,013,010,098,101,103,105,110,013,010,009,114,101,097,100,032,120,059,013,010,009,114,101,097,100,032,121,059,013,010,009,119,114,105,116,101,032,101,117,107,040,120,044,121,041,013,010,101,110,100]
 
 [tProgram, tVar(gcd), tLocal, tVar(x), tColon, tVar(y), tProcedure, tVar(euk), tLParen, tVar(x), tColon, tVar(y), tRParen, tLocal, tVar(t), tBegin, tWhile, tVar(y), tNeq, tNumber(0), tDo, tVar(t), tAssgn, tVar(x), tMod, tVar(y), tSColon, tVar(y), tAssgn, tVar(x), tSColon, tVar(x), tAssgn, tVar(t), tDone, tSColon, tReturn, tVar(y), tEnd, tBegin, tRead, tVar(x), tSColon, tRead, tVar(y), tSColon, tWrite, tVar(euk), tLParen, tVar(x), tColon, tVar(y), tRParen, tEnd]
+
+program([var(x, _G3427), var(y, _G3433)], 
+[func(euk, [arg(x, name), arg(y, name)], [var(t, _G3454)], [], [while(neq(var(y), 0), [assign(var(t), expr(var(x)mod var(y))), assign(var(y), expr(var(x))), assign(var(x), expr(var(t)))]), return(expr(var(y)))])], 
+[read(var(x)), read(var(y)), write(expr(funCall(euk, [var(x), var(y)])))])
+
+makro_compile([while(neq(var(y), 0), [assign(var(t), expr(var(x)mod var(y))), assign(var(y), expr(var(x))), assign(var(x), expr(var(t)))]), return(expr(var(y)))],[var(t, _G3454),var(x, _G3427), var(y, _G3433)],[],M).
+
+[label(3), load('$VAR'('_G3433')), push, const(0), swapd, pop, minus, branchz(1), const(0), jump(2), label(1), const(-1), label(2), branchn(4), load('$VAR'('_G3427')), push, load('$VAR'('_G3433')), swapd, pop, mod, store('$VAR'('_G3454')), load('$VAR'('_G3427')), store('$VAR'('_G3433')), load('$VAR'('_G3454')), store('$VAR'('_G3427')), jump(3), label(4), load('$VAR'('_G3433'))]
+
+[label(3), const('$VAR'('_G3433')), swapa, load, swapd, const(65535), swapa, load, swapa, swapd, store, const(1), swapd, swapa, sub, store, const(0), swapd, const(65535), swapa, load, swapd, swapa, const(1), swapd, sub, swapa, swapd, const(65535), swapa, store, swapa, load, minus, swapa, const(label(1)), swapa, branchz, const(0), swapa, const(label(2)), swapa, jump, label(1), const(-1), label(2), swapa, const(label(4)), swapa, branchn, const('$VAR'('_G3427')), swapa, load, swapd, const(65535), swapa, load, swapa, swapd, store, const(1), swapd, swapa, sub, store, const('$VAR'('_G3433')), swapa, load, swapd, const(65535), swapa, load, swapd, swapa, const(1), swapd, sub, swapa, swapd, const(65535), swapa, store, swapa, load, div, const(-16), swapd, shift, swapa, const('$VAR'('_G3454')), swapa, store, const('$VAR'('_G3427')), swapa, load, swapa, const('$VAR'('_G3433')), swapa, store, const('$VAR'('_G3454')), swapa, load, swapa, const('$VAR'('_G3427')), swapa, store, swapa, const(label(3)), swapa, jump, label(4), const('$VAR'('_G3433')), swapa, load]
+
+ [label(3), 
+ [const('$VAR'('_G3433')), swapa, load, swapd], 
+ [const('FFFF'), swapa, load, swapa], 
+ [swapd, store, const(1), swapd], 
+ [swapa, sub, store, const(0)], 
+ [swapd, const('FFFF'), swapa, load], 
+ [swapd, swapa, const(1), swapd], 
+ [sub, swapa, swapd, const('FFFF')], 
+ [swapa, store, swapa, load],
+ [sub, swapa, const(1), swapa],
+ [branchz, nop, nop, nop],
+ [const(0), swapa, const(2), swapa],
+ [jump, nop, nop, nop],
+ label(1), 
+ [const(-1), nop, nop, nop],
+ label(2), 
+ [swapa, const(4), swapa, branchn],
+ [const('$VAR'('_G3427')), swapa, load, swapd],
+ [const('FFFF'), swapa, load, swapa],
+ [swapd, store, const(1), swapd],
+ [swapa, sub, store, const('$VAR'('_G3433'))],
+ [swapa, load, swapd, const('FFFF')],
+ [swapa, load, swapd, swapa],
+ [const(1), swapd, sub, swapa],
+ [swapd, const('FFFF'), swapa, store],
+ [swapa, load, div, const(-16)],
+ [swapd, shift, swapa, const('$VAR'('_G3454'))],
+ [swapa, store, const('$VAR'('_G3427')), swapa],
+ [load, swapa, const('$VAR'('_G3433')), swapa],
+ [store, const('$VAR'('_G3454')), swapa, load],
+ [swapa, const('$VAR'('_G3427')), swapa, store],
+ [swapa, const(3), swapa, jump],
+ label(4), 
+ [const('$VAR'('_G3433')), swapa, load]
+ ]
+
+
+ [[const, swapa, load, swapd],
+ ['$VAR'('_G3433')],
+ [const, swapa, load, swapa],
+ ['FFFF'],
+ [swapd, store, const, swapd],
+ [1],
+ [swapa, sub, store, const],
+ [0],
+ [swapd, const, swapa, load],
+ ['FFFF'],
+ [swapd, swapa, const, swapd],
+ [1],
+ [sub, swapa, swapd, const],
+ ['FFFF'],
+ [swapa, store, swapa, load],
+ [],
+ [sub, swapa, const, swapa],
+ [1],
+ [branchz, nop, nop, nop],
+ [],
+ [const, swapa, const, swapa],
+ [0, 2],
+ [jump, nop, nop, nop],
+ [],
+ [const, nop, nop, nop],
+ [-1],
+ [swapa, const, swapa, branchn],
+ [4],
+ [const, swapa, load, swapd],
+ ['$VAR'('_G3427')],
+ [const, swapa, load, swapa],
+ ['FFFF'],
+ [swapd, store, const, swapd],
+ [1],
+ [swapa, sub, store, const],
+ ['$VAR'('_G3433')],
+ [swapa, load, swapd, const],
+ ['FFFF'],
+ [swapa, load, swapd, swapa],
+ [],
+ [const, swapd, sub, swapa],
+ [1],
+ [swapd, const, swapa, store],
+ ['FFFF'],
+ [swapa, load, div, const],
+ [-16],
+ [swapd, shift, swapa, const],
+ ['$VAR'('_G3454')],
+ [swapa, store, const, swapa],
+ ['$VAR'('_G3427')],
+ [load, swapa, const, swapa],
+ ['$VAR'('_G3433')],
+ [store, const, swapa, load],
+ ['$VAR'('_G3454')],
+ [swapa, const, swapa, store],
+ ['$VAR'('_G3427')],
+ [swapa, const, swapa, jump],
+ [3],
+ [const, swapa, load],
+ ['$VAR'('_G3433')]]
 
 program 2
 	local x
