@@ -92,10 +92,10 @@ identifier(L, Id) -->
                     | "if" bool_expr "then" program "else" program "fi"
                     | "if" bool_expr "then" program "fi"
                     | "skip" ";"
-                    | variable ":=" artith_expr ";"
+                    | viable ":=" artith_expr ";"
       arith_expr --> arith_expr additive_op summand | summand
       summand --> summand multiplicative_op factor | factor
-      factor --> "(" arith_expr ")" | constant | variable
+      factor --> "(" arith_expr ")" | constant | viable
       additive_op --> "+" | "-"
       multiplicative_op --> "*" | "div" | "mod"
       bool_expr --> bool_expr "or" disjunct | disjunct
@@ -116,8 +116,8 @@ declarations(EV,[F|EF]) --> procDecl(F),!,declarations(EV,EF).
 declarations(EV,EF) --> varDecl(V),!, declarations(EV2,EF),{append(V,EV2,EV)}.
 declarations([],[]) --> [].
 
-varDecl([V|EV]) --> [tLocal],[tVar(Id)],{V = var(Id,Adr)}, cvarDecl(EV).
-cvarDecl([V|EV]) --> [tColon],!, [tVar(Id)],{V = var(Id,Adr)} , cvarDecl(EV).
+varDecl([V|EV]) --> [tLocal],[tVar(Id)],{V = v(Id,Adr)}, cvarDecl(EV).
+cvarDecl([V|EV]) --> [tColon],!, [tVar(Id)],{V = v(Id,Adr)} , cvarDecl(EV).
 cvarDecl([]) --> [].
 
 procDecl(F) --> [tProcedure], [tVar(Id)],
@@ -135,10 +135,10 @@ procArg(A) --> [tValue],!, [tVar(Id)],{A = arg(Id, value)}.
 procArg(A) --> [tVar(Id)], {A = arg(Id, name)}.
 % instrukcje--------------------------------------------------------------
 instructions([I|IS]) --> instruction(I), cinstructions(IS).
-cinstructions([I|IS]) --> [tSColon], instruction(I), cinstructions(IS).
+cinstructions([I|IS]) --> [tSColon],!, instruction(I), cinstructions(IS).
 cinstructions([]) --> [].
 instruction(I) --> (
-    [tVar(Id)],!,[tAssgn], arithmeticExpr(E), {I = assign(var(Id),expr(E))} ;
+    [tVar(Id)],!,[tAssgn], arithmeticExpr(E), {I = assign(v(Id),expr(E))} ;
     [tIf],!, boolExpr(B),
             [tThen], instructions(Iif),
             [tElse], instructions(Ielse),[tFi],
@@ -151,7 +151,7 @@ instruction(I) --> (
 	    {I = while(B,Ido)};
     [tCall],!, fcall(F), {I = F};
     [tReturn],!, arithmeticExpr(E),{I = return(expr(E))};
-    [tRead],!, [tVar(Id)], {I = read(var(Id))};
+    [tRead],!, [tVar(Id)], {I = read(v(Id))};
     [tWrite], arithmeticExpr(E), {I = write(expr(E))}
 ).
 % wyrazenia-arytmetyczne--------------------------------------------------
@@ -168,7 +168,7 @@ simpleExpr(S) --> ( patomicExpr(S), !; [tMinus], patomicExpr(Sn), {S = neg(Sn)})
 patomicExpr(S) --> ( atomicExpr(S), !; [tLParen], arithmeticExpr(S), [tRParen]).
 atomicExpr(S) --> (
     fcall(F),!, {S = F};
-    [tVar(Id)],!, {S = var(Id)};
+    [tVar(Id)],!, {S = v(Id)};
     [tNumber(S)]).
 
 addtiveOp(add) --> [tPlus],!.
@@ -216,11 +216,6 @@ concat([H|L],R):-
 
 %%	labels counter
 %
-:-nb_setval(counter,1).
-get_label_id(X):-
-	b_getval(counter,X),
-	N is X + 1,
-	b_setval(counter,N).
 
 makro_compile([],_,_,[]).
 makro_compile([I|IS],EV,EF,Makro):-
@@ -230,8 +225,8 @@ makro_compile([I|IS],EV,EF,Makro):-
 
 
 
-makro_compile_instruction(assign(var(LValueId),expr(RValueId)),EV,EF,Makro):-!,
-	memberchk(var(LValueId,LVAddr),EV),
+makro_compile_instruction(assign(v(LValueId),expr(RValueId)),EV,EF,Makro):-!,
+	memberchk(v(LValueId,LVAddr),EV),
 	makro_compile_expression(RValueId,EV,EF,Makro_expr),
 	append(Makro_expr,[store(LVAddr)],Makro).
 
@@ -239,8 +234,6 @@ makro_compile_instruction(if(Condition,Then,Else),EV,EF,Makro):-!,
 	makro_compile_condition(Condition, EV, EF, Makro_Condition),
 	makro_compile(Then, EV, EF, Makro_Then),
 	makro_compile(Else, EV, EF, Makro_Else),
-	get_label_id(Else_id),
-	get_label_id(End_id),
 	concat([Makro_Condition, [branchn(Else_id)],
 		Makro_Then, [jump(Else_id),label(End_id)],
 		Makro_Else, [label(End_id)]],Makro).
@@ -248,13 +241,10 @@ makro_compile_instruction(if(Condition,Then,Else),EV,EF,Makro):-!,
 makro_compile_instruction(if(Condition,Then),EV,EF,Makro):-!,
 	makro_compile_condition(Condition, EV, EF, Makro_Condition),
 	makro_compile(Then, EV, EF, Makro_Then),
-	get_label_id(End_id),
 	concat([Makro_Condition,[branchn(End_id)],Makro_Then,[label(End_id)]],Makro).
 makro_compile_instruction(while(Condition,Do),EV,EF,Makro):-!,
 	makro_compile_condition(Condition, EV, EF, Makro_Condition),
 	makro_compile(Do, EV, EF, Makro_Do),
-	get_label_id(Start_id),
-	get_label_id(End_id),
 	concat([[label(Start_id)],Makro_Condition,
 	       [branchn(End_id)]
 	       ,Makro_Do,
@@ -266,8 +256,8 @@ makro_compile_instruction(return(expr(E)),EV,EF,Makro):-!,
 %makro_compile_instruction(funCall(Id,Args),EV,EF,Makro):-
 %makro_compile_instruction(return(expr(E)),EV,EF,Makro):-
 %%	write: ACC --> O
-makro_compile_instruction(read(var(X)),EV,EF,Makro):-!,
-	memberchk(var(X,Addr),EV),
+makro_compile_instruction(read(v(X)),EV,EF,Makro):-!,
+	memberchk(v(X,Addr),EV),
 	Makro = [read(Addr)].
 makro_compile_instruction(write(expr(E)),EV,EF,Makro):-
 	makro_compile_expression(E,EV,EF,Makro_expr),
@@ -285,8 +275,8 @@ makro_compile_expression(N,E,EV,EF,Makro_expr):-
 	N2 is N+1,
 	makro_compile_expression(N2,E2,EV,EF,Makro_expr2),
 	concat([Makro_expr1,[push],Makro_expr2, [swapd,pop, Op]],Makro_expr).
-makro_compile_expression(N,var(X),EV,EF,Makro_expr):-!,
-	memberchk(var(X,Addr),EV),
+makro_compile_expression(N,v(X),EV,EF,Makro_expr):-!,
+	memberchk(v(X,Addr),EV),
 	Makro_expr = [load(Addr)].
 makro_compile_expression(N, Number, EV, EF, [const(Number)]).
 
@@ -295,21 +285,17 @@ makro_compile_expression(N, Number, EV, EF, [const(Number)]).
 makro_compile_codition(or(C1,C2), EV, EF, Makro_Condition):-
 	makro_compile_condition(C1, EV, EF, Makro_Condition1),
 	makro_compile_condition(C2, EV, EF, Makro_Condition2),
-	get_label_id(True_id),
 	concat([Makro_Condition1, [branchz(True_id)],
 		Makro_Condition2, [label(True_id)]]
 	       ,Makro_Condition).
 makro_compile_codition(and(C1,C2), EV, EF, Makro_Condition):-
 	makro_compile_condition(C1, EV, EF, Makro_Condition1),
 	makro_compile_condition(C2, EV, EF, Makro_Condition2),
-	get_label_id(False_id),
 	concat([Makro_Condition1, [branchn(False_id)],
 		Makro_Condition2, [label(False_id)]]
 	       ,Makro_Condition).
 makro_compile_condition(not(C), EV, EF, Makro_Condition):-
 	makro_compile_condition(C, EV, EF, Makro_Condition1),
-	get_label_id(False_id),
-	get_label_id(End_id),
 	concat([Makro_Condition1,[branchz(False_id),
 		const(0),jump(End_id),
 	        label(False_id),const(-1),
@@ -319,30 +305,29 @@ makro_compile_condition(R_Cond, EV, EF, Makro_Condition):-
 	makro_compile_expression(E1,EV,EF,Makro_expr1),
 	makro_compile_expression(E2,EV,EF,Makro_expr2),
 
-	(   Op == eq,!, Swap = false, get_label_id(End_id),
+	(   Op == eq,!, Swap = false,
 	    Jumps = [branchz(End_id),const(-1),label(End_id)]
-
-	;   Op == neq,!, Swap = false, get_label_id(False_id),get_label_id(End_id),
+	;   Op == neq,!, Swap = false,
 	    Jumps = [branchz(False_id),const(0),jump(End_id),label(False_id),
 		    const(-1),label(End_id)]
 
-	;   Op == geq,!, Swap = false, get_label_id(End_id),
+	;   Op == geq,!, Swap = false,
 	    Jumps = [branchn(End_id),const(0),label(End_id)]
 
-	;   Op == gt,!, Swap = true, get_label_id(True_id), get_label_id(End_id),
+	;   Op == gt,!, Swap = true,
 	    Jumps = [branchn(True_id),const(-1), jump(End_id),
 		     label(True_id),const(0),label(End_id)]
 
-	;   Op == lt,!, Swap = false, get_label_id(True_id), get_label_id(End_id),
+	;   Op == lt,!, Swap = false,
 	    Jumps = [branchn(True_id),const(-1), jump(End_id),
 		     label(True_id),const(0),label(End_id)]
 
-	;   Op == leq, Swap = true, get_label_id(End_id),
+	;   Op == leq, Swap = true,
 	    Jumps = [branchn(End_id),const(0),label(End_id)]),
 	(   Swap == false,!,
 	    concat([Makro_expr1, [push],Makro_expr2,[swapd,pop,sub]],Start)
 	;   concat([Makro_expr2, [push],Makro_expr1,[swapd,pop,sub]],Start)),
-
+	var(End_id),
 	concat([Start,Jumps],Makro_Condition).
 
 
@@ -355,27 +340,33 @@ assembly_makro_instruction(pop,Makro):-!,
 	Makro = [const(65535),swapa,load,swapd,swapa,const(1),swapd,
 		 sub,swapa,swapd,const(65535),swapa,store,swapa,load].
 
+assembly_makro_instruction(read(Addr),Makro):-!,
+	Makro = [const(1),syscall,swapa,const(v(Addr)),swapa,store].
+
+assembly_makro_instruction(write,Makro):-!,
+	Makro = [swapd,const(2),syscall].
+
 assembly_makro_instruction(load(Addr),Makro):-!,
-	Makro = [const(Addr),swapa,load].
+	Makro = [const(v(Addr)),swapa,load].
 
 assembly_makro_instruction(store(Addr),Makro):-!,
-	Makro = [swapa,const(Addr),swapa,store].
+	Makro = [swapa,const(v(Addr)),swapa,store].
 %saves ACC, DR
 assembly_makro_instruction(branchn(Label_id),Makro):-!,
-	Makro = [swapa,const(label(Label_id)),swapa,branchn].
+	Makro = [swapa,const(Label_id),swapa,branchn].
 %saves ACC, DR
 assembly_makro_instruction(branchz(Label_id),Makro):-!,
-	Makro = [swapa,const(label(Label_id)),swapa,branchz].
+	Makro = [swapa,const(Label_id),swapa,branchz].
 %saves ACC, DR
 assembly_makro_instruction(jump(Label_id),Makro):-!,
-	Makro = [swapa,const(label(Label_id)),swapa,jump].
+	Makro = [swapa,const(Label_id),swapa,jump].
 % ACC mod DR -> ACC
 assembly_makro_instruction(mod,Makro):-
 	Makro = [div,const(-16),swapd,shift].
 
-first_assembly([],[]):-!.
+first_assembly([],[const(0),syscall]):-!.
 first_assembly([M|Makros],FASSEMBLY):-
-	(assembly_makro_instruction(M,Assembly_inst)
+	(assembly_makro_instruction(M,Assembly_inst),!
 	;Assembly_inst = [M]),
 	first_assembly(Makros,FArest),
 	append(Assembly_inst,FArest,FASSEMBLY).
@@ -403,6 +394,7 @@ pack(AIS,P,[P|L]):-
 	pack(AIS,[],L).
 
 pack([label(Id)|AIS],[],[label(Id)|L]):-!,
+	var(Id),
 	pack(AIS,[],L).
 pack([label(Id)|AIS],P,[P2,label(Id)|L]):-!,
 	fill_with_NOPS(P,P2),
@@ -418,6 +410,7 @@ pack([AI|AIS],P,L):-
 	append(P,[AI],P2),!,
 	pack(AIS,P2,L).
 
+pack([],[],[]):-!.
 pack([],P,[P]).
 
 
@@ -427,25 +420,97 @@ dec_to_machine_word(N,MW):-
 dec_to_machine_word(N,MW):-
 	MW is 65536+N.
 
-assembly_const([],[]).
-assembly_const([label(_)|L],R):-!,
+assembly_const([],[]):-!.
+assembly_const([label(Id)|L],[label(Id)|R]):-!,
 	assembly_const(L,R).
 assembly_const([H|L],[E|R]):-
 	get_consts(H,Cs,E),
 	Cs == [],!,
 	assembly_const(L,R).
-assembly_const([H|L],[E,Cs|R]):-
+assembly_const([H|L],R):-
 	get_consts(H,Cs,E),
-	assembly_const(L,R).
+	assembly_const(L,R2),
+	concat([[E],Cs,R2],R).
 
 
-get_consts([],[],[]).
-get_consts([const(C)|L],[C|R],[const|E]):-!,
+
+get_consts([],[],[]):-!.
+get_consts([const(C)|L],[MW|R],[const|E]):-!,
+	(number(C),!,dec_to_machine_word(C,MW);MW = C),
 	get_consts(L,R,E).
 get_consts([H|L],R,[H|E]):-
 	get_consts(L,R,E).
 
-set_labels(I,R,ML):-
-	set_labels(I,R,ML,0).
+set_labels(L,R,S):-
+	set_labels(L,R,0,S).
+set_labels([],[],S,S):-!.
+set_labels([Label|L],R,C,S):-
+	nonvar(Label),
+	Label = label(Id),!,
+	Id = C,
+	set_labels(L,R,C,S).
+set_labels([B|L],[B|R],C,S):-
+	C1 is C+1,
+	set_labels(L,R,C1,S).
+
+make_word(L,R):-
+	make_word(L,0,R).
+make_word([],R,R).
+make_word([I|IS],CS,R):-
+	(   I == nop,!, C = 0
+	;   I == syscall,!, C = 1
+	;   I == load,!, C = 2
+	;   I == store,!, C = 3
+	;   I == swapa,!, C = 4
+	;   I == swapd,!, C = 5
+	;   I == branchz,!, C = 6
+	;   I == branchn,!, C = 7
+	;   I == jump,!, C = 8
+	;   I == const,!, C = 9
+	;   I == add,!, C = 10
+	;   I == sub,!, C = 11
+	;   I == mul,!, C = 12
+	;   I == div,!, C = 13
+	;   I == shift,!, C = 14
+	;   I == nand,!, C = 15
+	;   C = I),
+	CS2 is CS*16+C,
+	make_word(IS,CS2,R).
+
+set_var(L,R,Addr,EV):-
+	unify_var(EV,Addr),
+	set_var(L,R).
+
+unify_var([],_):-!.
+unify_var([v(Id,X)|L],Addr):-
+	NA is Addr + 1,
+	X is NA,
+	unify_var(L,NA).
+
+set_var([],[]):-!.
+set_var([v(X)|L],[X|R]):-!,
+	set_var(L,R).
+set_var([H|L],[H|R]):-
+	set_var(L,R).
+
+convert_to_words([],[]):-!.
+convert_to_words([H|L],[LW|R]):-
+	(is_list(H),!,make_word(H,LW);LW=H),
+	convert_to_words(L,R).
+
+
+algol16(Source,SextiumBin):-
+	phrase(lexer(Tokens),Source),
+	phrase(parser(program(EV,EF,I)),Tokens),
+	makro_compile(I,EV,EF,Makro),
+	first_assembly(Makro, ASM),
+	pack(ASM,[],PASM),
+	assembly_const(PASM,PASM2),
+	set_labels(PASM2,PASM3,Size),
+	set_var(PASM3,PASM4,Size,EV),
+	convert_to_words(PASM4,SextiumBin).
+%
+
+
 
 
