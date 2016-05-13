@@ -1,5 +1,5 @@
 .PHONY: programs all clean distclean
-CFLAGS = --std=gnu11 -Wall -Wextra -Wpedantic
+CFLAGS = --std=gnu11 -Wall -Wextra -Wpedantic -g
 CC = gcc $(CFLAGS)
 ASSEMBLE = ./assemble
 SAMPLE_PROGS = sum.sextium halt.sextium gcd.sextium

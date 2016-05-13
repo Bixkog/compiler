@@ -5,10 +5,10 @@ begin
 	read y;
 	while y <> 0 do
 		t := x mod y;
-		y := x;
-		x := t
+		x := y;
+		y := t
 		done;
-	write t
+	write x
 end
 
 [112,114,111,103,114,097,109,032,103,099,100,013,010,009,108,111,099,097,108,032,120,044,032,121,044,032,116,013,010,098,101,103,105,110,013,010,009,114,101,097,100,032,120,059,013,010,009,114,101,097,100,032,121,059,013,010,009,119,104,105,108,101,032,121,032,060,062,032,048,032,100,111,013,010,009,009,116,032,058,061,032,120,032,109,111,100,032,121,059,013,010,009,009,121,032,058,061,032,120,059,013,010,009,009,120,032,058,061,032,116,013,010,009,009,100,111,110,101,059,013,010,009,119,114,105,116,101,032,116,013,010,101,110,100]
@@ -32,6 +32,9 @@ assembly_const
 
 labels_set
  [[const, syscall, swapa, const], 1, v(_G28), [swapa, store, const, syscall], 1, [swapa, const, swapa, store], v(_G31), [const, swapa, load, swapd], v(_G31), [const, swapa, load, swapa], 65535, [swapd, store, const, swapd], 1, [swapa, sub, store, const], 0, [swapd, const, swapa, load], 65535, [swapd, swapa, const, swapd], 1, [sub, swapa, swapd, const], 65535, [swapa, store, swapa, load], [sub, swapa, const, swapa], 29, [branchz, nop, nop, nop], [const, swapa, const, swapa], 0, 31, [jump, nop, nop, nop], [const, nop, nop, nop], 65535, [swapa, const, swapa, branchn], 62, [const, swapa, load, swapd], v(_G28), [const, swapa, load, swapa], 65535, [swapd, store, const, swapd], 1, [swapa, sub, store, const], v(_G31), [swapa, load, swapd, const], 65535, [swapa, load, swapd, swapa], [const, swapd, sub, swapa], 1, [swapd, const, swapa, store], 65535, [swapa, load, div, const], 65520, [swapd, shift, swapa, const], v(_G34), [swapa, store, const, swapa], v(_G28), [load, swapa, const, swapa], v(_G31), [store, const, swapa, load], v(_G34), [swapa, const, swapa, store], v(_G28), [swapa, const, swapa, jump], 7, [const, swapa, load, swapd], v(_G34), [const, syscall, const, syscall], 2, 0]
+
+[[const,swapa,const,store],65535,65534,[const,swapa,const,syscall],71,1,[store,const,swapa,const],72,1,[syscall,store,nop,nop],[const,swapa,load,swapd],72,[const,swapa,load,swapa],65535,[swapd,store,const,swapd],1,[swapa,sub,store,const],0,[swapd,const,swapa,load],65535,[swapd,swapa,const,swapd],1,[add,swapa,swapd,const],65535,[swapa,store,swapa,load],[sub,swapa,const,swapa],32,[branchz,nop,nop,nop],[const,swapa,const,swapa],0,34,[jump,nop,nop,nop],[const,nop,nop,nop],65535,[swapa,const,swapa,branchn],65,[const,swapa,load,swapd],71,[const,swapa,load,swapa],65535,[swapd,store,const,swapd],1,[swapa,sub,store,const],72,[swapa,load,swapd,const],65535,[swapa,load,swapd,swapa],[const,swapd,add,swapa],1,[swapd,const,swapa,store],65535,[swapa,load,div,const],65520,[swapd,shift,swapa,const],73,[swapa,store,const,swapa],71,[load,swapa,const,swapa],72,[store,const,swapa,load],73,[swapa,const,swapa,store],71,[swapa,const,swapa,jump],10,[const,swapa,load,swapd],73,[const,syscall,const,syscall],2,0]
+
 
 program 2
 	local x

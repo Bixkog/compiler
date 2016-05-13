@@ -1,3 +1,5 @@
+%lexer to zmodyfikowany lexer z while_parser
+
 lexer(Tokens) -->
    white_space,
    (  (  ":=",      !, { Token = tAssgn }
@@ -47,13 +49,13 @@ lexer(Tokens) -->
    ;  [],{ Tokens = [] }
    ).
 
-white_space --> "(*", !, comment.
+white_space --> "(*", !, comment, white_space.
 white_space -->
    [Char], { code_type(Char, space) }, !, white_space.
 white_space -->
    [].
 
-comment --> ([_], comment; "*)").
+comment --> ( "*)",!;[_], comment).
 
 digit(D) -->
    [D],
@@ -74,7 +76,7 @@ letter(L) -->
    [L], { (code_type(L, alpha))}.
 
 alphanum([A|T]) -->
-   [A], { (code_type(A, alnum);A == 95;A == 96) }, !, alphanum(T).
+   [A], { (code_type(A, alnum);A == 95;A == 39) }, !, alphanum(T).
 alphanum([]) -->
    [].
 
@@ -82,32 +84,7 @@ identifier(L, Id) -->
    alphanum(As),
       { atom_codes(Id, [L|As]) }.
 
-/*
-   SYNTAX ANALYSIS
 
-   Context-free grammar:
-
-      program --> instruction | instruction program
-      instruction --> "while" bool_expr "do" program "done"
-                    | "if" bool_expr "then" program "else" program "fi"
-                    | "if" bool_expr "then" program "fi"
-                    | "skip" ";"
-                    | viable ":=" artith_expr ";"
-      arith_expr --> arith_expr additive_op summand | summand
-      summand --> summand multiplicative_op factor | factor
-      factor --> "(" arith_expr ")" | constant | viable
-      additive_op --> "+" | "-"
-      multiplicative_op --> "*" | "div" | "mod"
-      bool_expr --> bool_expr "or" disjunct | disjunct
-      disjunct --> disjunct "and" conjunct | conjunct
-      conjunct --> "(" bool_expr ")" | "not" conjunct | "true" | "false"
-                 | arith_expr rel_op arith_expr
-      rel_op --> "=" | "<>" | "<" | "<=" | ">" | ">="
-
-   To get a complete parser it suffices to replace character terminals
-   in the grammar above with lexical tens, eliminate left recursion and
-   add appropriate semantic actions generating abstract syntax trees.
-*/
 % program----------------------------------------------------------------
 parser(program(EV,EF,I)) --> [tProgram],[_], block(EV,EF,I).
 block(EV,EF,I) --> declarations(EV,EF), [tBegin], instructions(I), [tEnd].
@@ -139,12 +116,12 @@ cinstructions([I|IS]) --> [tSColon],!, instruction(I), cinstructions(IS).
 cinstructions([]) --> [].
 instruction(I) --> (
     [tVar(Id)],!,[tAssgn], arithmeticExpr(E), {I = assign(v(Id),expr(E))} ;
-    [tIf],!, boolExpr(B),
+    [tIf], boolExpr(B),
             [tThen], instructions(Iif),
-            [tElse], instructions(Ielse),[tFi],
+            [tElse],!, instructions(Ielse),[tFi],
 	    {I = if(B,Iif,Ielse)};
     [tIf],!, boolExpr(B),
-            [tThen], instructions(Iif),
+            [tThen], instructions(Iif),[tFi],
 	    {I = if(B,Iif)};
     [tWhile],!, boolExpr(B),
             [tDo],instructions(Ido),[tDone],
@@ -194,12 +171,13 @@ andExpr(A) --> cond(C), randExpr(C,A).
 randExpr(C,A) --> [tAnd], !, cond(C2), {N = and(C,C2)}, randExpr(N,A).
 randExpr(A,A) --> [].
 
-cond(C) --> [tLParen],!,boolExpr(C),[tPParen].
 cond(C) --> arithmeticExpr(E1), relationalOp(Op), arithmeticExpr(E2), {C =.. [Op,E1,E2]}.
+cond(C) --> [tLParen],!,boolExpr(C),[tRParen].
+
 
 relationalOp(Op) -->(
     [tEq],!,{Op = eq};
-    [tLeq],!,{Op = geq};
+    [tLeq],!,{Op = leq};
     [tGeq],!,{Op = geq};
     [tLt],!,{Op = lt};
     [tGt],!,{Op = gt};
@@ -235,7 +213,7 @@ makro_compile_instruction(if(Condition,Then,Else),EV,EF,Makro):-!,
 	makro_compile(Then, EV, EF, Makro_Then),
 	makro_compile(Else, EV, EF, Makro_Else),
 	concat([Makro_Condition, [branchn(Else_id)],
-		Makro_Then, [jump(Else_id),label(End_id)],
+		Makro_Then, [jump(End_id),label(Else_id)],
 		Makro_Else, [label(End_id)]],Makro).
 
 makro_compile_instruction(if(Condition,Then),EV,EF,Makro):-!,
@@ -278,26 +256,28 @@ makro_compile_expression(N,E,EV,EF,Makro_expr):-
 makro_compile_expression(N,v(X),EV,EF,Makro_expr):-!,
 	memberchk(v(X,Addr),EV),
 	Makro_expr = [load(Addr)].
+makro_compile_expression(N, neg(Number), EV, EF, [const(NegNumber)]):-!,
+    NegNumber is (-1)*Number.
 makro_compile_expression(N, Number, EV, EF, [const(Number)]).
 
 %%	m_c_condition: Condition -> ACC = 0 if true ; ACC < 0 if false
 %%	branch should not destroy ACC
-makro_compile_codition(or(C1,C2), EV, EF, Makro_Condition):-
+makro_compile_condition(or(C1,C2), EV, EF, Makro_Condition):-!,
 	makro_compile_condition(C1, EV, EF, Makro_Condition1),
 	makro_compile_condition(C2, EV, EF, Makro_Condition2),
 	concat([Makro_Condition1, [branchz(True_id)],
 		Makro_Condition2, [label(True_id)]]
 	       ,Makro_Condition).
-makro_compile_codition(and(C1,C2), EV, EF, Makro_Condition):-
+makro_compile_condition(and(C1,C2), EV, EF, Makro_Condition):-!,
 	makro_compile_condition(C1, EV, EF, Makro_Condition1),
 	makro_compile_condition(C2, EV, EF, Makro_Condition2),
 	concat([Makro_Condition1, [branchn(False_id)],
 		Makro_Condition2, [label(False_id)]]
 	       ,Makro_Condition).
-makro_compile_condition(not(C), EV, EF, Makro_Condition):-
+makro_compile_condition(not(C), EV, EF, Makro_Condition):-!,
 	makro_compile_condition(C, EV, EF, Makro_Condition1),
 	concat([Makro_Condition1,[branchz(False_id),
-		const(0),jump(End_id),
+		const(0),branchz(End_id),
 	        label(False_id),const(-1),
 		label(End_id)]],Makro_Condition).
 makro_compile_condition(R_Cond, EV, EF, Makro_Condition):-
@@ -307,27 +287,28 @@ makro_compile_condition(R_Cond, EV, EF, Makro_Condition):-
 
 	(   Op == eq,!, Swap = false,
 	    Jumps = [branchz(End_id),const(-1),label(End_id)]
+
 	;   Op == neq,!, Swap = false,
-	    Jumps = [branchz(False_id),const(0),jump(End_id),label(False_id),
+	    Jumps = [branchz(False_id),const(0),branchz(End_id),label(False_id),
 		    const(-1),label(End_id)]
 
 	;   Op == geq,!, Swap = false,
 	    Jumps = [branchn(End_id),const(0),label(End_id)]
 
 	;   Op == gt,!, Swap = true,
-	    Jumps = [branchn(True_id),const(-1), jump(End_id),
+	    Jumps = [branchn(True_id),const(-1), branchn(End_id),
 		     label(True_id),const(0),label(End_id)]
 
 	;   Op == lt,!, Swap = false,
-	    Jumps = [branchn(True_id),const(-1), jump(End_id),
+	    Jumps = [branchn(True_id),const(-1), branchn(End_id),
 		     label(True_id),const(0),label(End_id)]
 
 	;   Op == leq, Swap = true,
 	    Jumps = [branchn(End_id),const(0),label(End_id)]),
+
 	(   Swap == false,!,
 	    concat([Makro_expr1, [push],Makro_expr2,[swapd,pop,sub]],Start)
 	;   concat([Makro_expr2, [push],Makro_expr1,[swapd,pop,sub]],Start)),
-	var(End_id),
 	concat([Start,Jumps],Makro_Condition).
 
 
@@ -338,7 +319,7 @@ assembly_makro_instruction(push,Makro):-!,
 %% pop: stack -> ACC, saves DR
 assembly_makro_instruction(pop,Makro):-!,
 	Makro = [const(65535),swapa,load,swapd,swapa,const(1),swapd,
-		 sub,swapa,swapd,const(65535),swapa,store,swapa,load].
+		 add,swapa,swapd,const(65535),swapa,store,swapa,load].
 
 assembly_makro_instruction(read(Addr),Makro):-!,
 	Makro = [const(v(Addr)),swapa,const(1),syscall,store].
@@ -357,9 +338,9 @@ assembly_makro_instruction(branchn(Label_id),Makro):-!,
 %saves ACC, DR
 assembly_makro_instruction(branchz(Label_id),Makro):-!,
 	Makro = [swapa,const(Label_id),swapa,branchz].
-%saves ACC, DR
+%saves AR, DR
 assembly_makro_instruction(jump(Label_id),Makro):-!,
-	Makro = [swapa,const(Label_id),swapa,jump].
+	Makro = [const(Label_id), jump].
 % ACC mod DR -> ACC
 assembly_makro_instruction(mod,Makro):-
 	Makro = [div,const(-16),swapd,shift].
@@ -504,12 +485,23 @@ algol16(Source,SextiumBin):-
 	phrase(parser(program(EV,EF,I)),Tokens),
 	makro_compile(I,EV,EF,Makro),
 	first_assembly(Makro, ASM),
-	pack(ASM,[],PASM),
+	pack([const(65535),swapa,const(65534),store|ASM],[],PASM),
 	assembly_const(PASM,PASM2),
 	set_labels(PASM2,PASM3,Size),
 	set_var(PASM3,PASM4,Size,EV),
 	convert_to_words(PASM4,SextiumBin).
-%
+
+writelist([]):-!.
+writelist([H|L]):-
+    writeln(H),
+    writelist(L).
+
+main:-
+    open("input",read,STR),
+    read_stream_to_codes(STR,Input),
+    algol16(Input,Bin),
+    writelist(Bin).
+
 
 
 
