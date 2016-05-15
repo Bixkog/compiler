@@ -290,37 +290,39 @@ makro_compile_condition(R_Cond, EV, EF, Makro_Condition):-
 	    Jumps = [branchz(End_id),const(-1),label(End_id)],
         concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,
             [branchn(End_id),jump(Test_id),label(Lesser_id)],
-            Makro_expr2,[swapd,const(0),sub,branchn(End_id),label(Test_id)]],PreTest)
+            Makro_expr2,[branchn(Test_id),const(0),branchz(End_id),label(Test_id)]],PreTest)
 
 	;   Op == neq,!, Swap = false,
 	    Jumps = [branchz(False_id),label(True_id),const(0),branchz(End_id),label(False_id),
 		    const(-1),label(End_id)],
         concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,[branchn(True_id),jump(Test_id),
-                label(Lesser_id)],Makro_expr2,[swapd,const(0),sub,branchn(True_id),
+                label(Lesser_id)],Makro_expr2,[branchn(Test_id),jump(True_id),
                 label(Test_id)]],PreTest)
 
 	;   Op == geq,!, Swap = false,
 	    Jumps = [branchn(End_id),label(True_id),const(0),label(End_id)],
         concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,[branchn(True_id),
-            jump(Test_id),label(Lesser_id)],Makro_expr2,[swapd,const(0),sub,branchn(End_id),
+            jump(Test_id),label(Lesser_id)],Makro_expr2,[branchn(Test_id),const(-1),branchn(End_id),
             label(Test_id)]],PreTest)
+
 	;   Op == gt,!, Swap = true,
-	    Jumps = [branchn(True_id),const(-1), branchn(End_id), label(True_id),const(0),label(End_id)],
+	    Jumps = [branchn(True_id),label(False_id),const(-1), branchn(End_id), 
+        label(True_id),const(0),label(End_id)],
         concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,[branchn(True_id),
-            jump(Test_id),label(Lesser_id)],Makro_expr2,[swapd,const(0),sub,branchn(End_id),
+            jump(Test_id),label(Lesser_id)],Makro_expr2,[branchn(Test_id),jump(False_id),
             label(Test_id)]],PreTest)
 
 	;   Op == lt,!, Swap = false,
 	    Jumps = [branchn(True_id),const(-1), branchn(End_id),
 		     label(True_id),const(0),label(End_id)],
         concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,[branchn(End_id),
-            jump(Test_id),label(Lesser_id)],Makro_expr2,[swapd,const(0),sub,branchn(True_id),
+            jump(Test_id),label(Lesser_id)],Makro_expr2,[branchn(Test_id),jump(True_id),
             label(Test_id)]],PreTest)
 
 	;   Op == leq, Swap = true,
 	    Jumps = [branchn(End_id),label(True_id),const(0),label(End_id)],
         concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,[branchn(End_id),
-            jump(Test_id),label(Lesser_id)],Makro_expr2,[swapd,const(0),sub,branchn(True_id),
+            jump(Test_id),label(Lesser_id)],Makro_expr2,[branchn(Test_id),jump(True_id),
             label(Test_id)]],PreTest)
     ),
 	(   Swap == false,!,
@@ -501,8 +503,8 @@ algol16(Source,SextiumBin):-
 	phrase(lexer(Tokens),Source),
 
 	phrase(parser(program(EV,EF,I)),Tokens),
-
 	makro_compile(I,EV,EF,Makro),
+
 	first_assembly(Makro, ASM),
 	pack([const(65535),swapa,const(65534),store|ASM],[],PASM),
 	assembly_const(PASM,PASM2),
