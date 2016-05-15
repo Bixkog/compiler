@@ -171,8 +171,10 @@ andExpr(A) --> cond(C), randExpr(C,A).
 randExpr(C,A) --> [tAnd], !, cond(C2), {N = and(C,C2)}, randExpr(N,A).
 randExpr(A,A) --> [].
 
-cond(C) --> arithmeticExpr(E1), relationalOp(Op), arithmeticExpr(E2), {C =.. [Op,E1,E2]}.
-cond(C) --> [tLParen],!,boolExpr(C),[tRParen].
+cond(C) --> [tNot],!, cond(C1),{ C = not(C1)}.
+cond(C) --> arithmeticExpr(E1),!, relationalOp(Op), arithmeticExpr(E2), 
+            {C =.. [Op,E1,E2]}.
+cond(C) --> [tLParen],boolExpr(C),[tRParen].
 
 
 relationalOp(Op) -->(
@@ -227,12 +229,9 @@ makro_compile_instruction(while(Condition,Do),EV,EF,Makro):-!,
 	       [branchn(End_id)]
 	       ,Makro_Do,
 	       [jump(Start_id),label(End_id)]],Makro).
-makro_compile_instruction(return(expr(E)),EV,EF,Makro):-!,
-	makro_compile_expression(E,EV,EF,Makro).
 
 
-%makro_compile_instruction(funCall(Id,Args),EV,EF,Makro):-
-%makro_compile_instruction(return(expr(E)),EV,EF,Makro):-
+
 %%	write: ACC --> O
 makro_compile_instruction(read(v(X)),EV,EF,Makro):-!,
 	memberchk(v(X,Addr),EV),
@@ -242,23 +241,25 @@ makro_compile_instruction(write(expr(E)),EV,EF,Makro):-
 	append(Makro_expr,[write],Makro).
 
 
-makro_compile_expression(E,EV,EF,Makro_expr):-
-	makro_compile_expression(0,E,EV,EF,Makro_expr).
 
-makro_compile_expression(N, funCall(Id,Args),EV,EF,Makro_expr):-!,
-	call_function(N,funCall(Id,Args),EV,EF,Makro_expr).
-makro_compile_expression(N,E,EV,EF,Makro_expr):-
+
+makro_compile_expression(E,EV,EF,Makro_expr):-
 	E =.. [Op, E1, E2],!,
-	makro_compile_expression(N,E1,EV,EF,Makro_expr1),
-	N2 is N+1,
-	makro_compile_expression(N2,E2,EV,EF,Makro_expr2),
+	makro_compile_expression(E1,EV,EF,Makro_expr1),
+	makro_compile_expression(E2,EV,EF,Makro_expr2),
 	concat([Makro_expr1,[push],Makro_expr2, [swapd,pop, Op]],Makro_expr).
-makro_compile_expression(N,v(X),EV,EF,Makro_expr):-!,
+makro_compile_expression(v(X),EV,EF,Makro_expr):-!,
 	memberchk(v(X,Addr),EV),
 	Makro_expr = [load(Addr)].
-makro_compile_expression(N, neg(Number), EV, EF, [const(NegNumber)]):-!,
-    NegNumber is (-1)*Number.
-makro_compile_expression(N, Number, EV, EF, [const(Number)]).
+makro_compile_expression(neg(Number), EV, EF, Makro):-
+    number(Number),!,
+    NegNumber is (-1)*Number,
+    Makro = [const(NegNumber)].
+
+makro_compile_expression(neg(Expr), EV, EF, Makro):-!,
+    makro_compile_expression(Expr,EV,EF,Me),
+    append(Me, [swapd,const(-1),mul],Makro).
+makro_compile_expression(Number, EV, EF, [const(Number)]).
 
 %%	m_c_condition: Condition -> ACC = 0 if true ; ACC < 0 if false
 %%	branch should not destroy ACC
@@ -286,30 +287,46 @@ makro_compile_condition(R_Cond, EV, EF, Makro_Condition):-
 	makro_compile_expression(E2,EV,EF,Makro_expr2),
 
 	(   Op == eq,!, Swap = false,
-	    Jumps = [branchz(End_id),const(-1),label(End_id)]
+	    Jumps = [branchz(End_id),const(-1),label(End_id)],
+        concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,
+            [branchn(End_id),jump(Test_id),label(Lesser_id)],
+            Makro_expr2,[swapd,const(0),sub,branchn(End_id),label(Test_id)]],PreTest)
 
 	;   Op == neq,!, Swap = false,
-	    Jumps = [branchz(False_id),const(0),branchz(End_id),label(False_id),
-		    const(-1),label(End_id)]
+	    Jumps = [branchz(False_id),label(True_id),const(0),branchz(End_id),label(False_id),
+		    const(-1),label(End_id)],
+        concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,[branchn(True_id),jump(Test_id),
+                label(Lesser_id)],Makro_expr2,[swapd,const(0),sub,branchn(True_id),
+                label(Test_id)]],PreTest)
 
 	;   Op == geq,!, Swap = false,
-	    Jumps = [branchn(End_id),const(0),label(End_id)]
-
+	    Jumps = [branchn(End_id),label(True_id),const(0),label(End_id)],
+        concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,[branchn(True_id),
+            jump(Test_id),label(Lesser_id)],Makro_expr2,[swapd,const(0),sub,branchn(End_id),
+            label(Test_id)]],PreTest)
 	;   Op == gt,!, Swap = true,
-	    Jumps = [branchn(True_id),const(-1), branchn(End_id),
-		     label(True_id),const(0),label(End_id)]
+	    Jumps = [branchn(True_id),const(-1), branchn(End_id), label(True_id),const(0),label(End_id)],
+        concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,[branchn(True_id),
+            jump(Test_id),label(Lesser_id)],Makro_expr2,[swapd,const(0),sub,branchn(End_id),
+            label(Test_id)]],PreTest)
 
 	;   Op == lt,!, Swap = false,
 	    Jumps = [branchn(True_id),const(-1), branchn(End_id),
-		     label(True_id),const(0),label(End_id)]
+		     label(True_id),const(0),label(End_id)],
+        concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,[branchn(End_id),
+            jump(Test_id),label(Lesser_id)],Makro_expr2,[swapd,const(0),sub,branchn(True_id),
+            label(Test_id)]],PreTest)
 
 	;   Op == leq, Swap = true,
-	    Jumps = [branchn(End_id),const(0),label(End_id)]),
-
+	    Jumps = [branchn(End_id),label(True_id),const(0),label(End_id)],
+        concat([Makro_expr1,[branchn(Lesser_id)],Makro_expr2,[branchn(End_id),
+            jump(Test_id),label(Lesser_id)],Makro_expr2,[swapd,const(0),sub,branchn(True_id),
+            label(Test_id)]],PreTest)
+    ),
 	(   Swap == false,!,
 	    concat([Makro_expr1, [push],Makro_expr2,[swapd,pop,sub]],Start)
 	;   concat([Makro_expr2, [push],Makro_expr1,[swapd,pop,sub]],Start)),
-	concat([Start,Jumps],Makro_Condition).
+	concat([PreTest,Start,Jumps],Makro_Condition).
 
 
 %% push: ACC -> stack
@@ -482,7 +499,9 @@ convert_to_words([H|L],[LW|R]):-
 
 algol16(Source,SextiumBin):-
 	phrase(lexer(Tokens),Source),
+
 	phrase(parser(program(EV,EF,I)),Tokens),
+
 	makro_compile(I,EV,EF,Makro),
 	first_assembly(Makro, ASM),
 	pack([const(65535),swapa,const(65534),store|ASM],[],PASM),
@@ -497,7 +516,7 @@ writelist([H|L]):-
     writelist(L).
 
 main:-
-    open("input",read,STR),
+    open("input2",read,STR),
     read_stream_to_codes(STR,Input),
     algol16(Input,Bin),
     writelist(Bin).
